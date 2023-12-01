@@ -1,80 +1,46 @@
-# From https://github.com/abourget/gevent-socketio/tree/master/examples
 import os
 from mindflex import MindFlexConnection
 
 from gevent import monkey; monkey.patch_all()
 import gevent
 
-from socketio import socketio_manage
-from socketio.server import SocketIOServer
-from socketio.namespace import BaseNamespace
+from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, url_for, copy_current_request_context
 
-INTERFACE_FOLDER = 'interface'
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
 
-def broadcast_msg(server, ns_name, event, *args):
-    pkt = dict(type="event",
-               name=event,
-               args=args,
-               endpoint=ns_name)
+def broadcast_msg(event, *args):
+    socketio.emit(event, args, namespace='/mindflex')
 
-    for sessid, socket in server.sockets.iteritems():
-        socket.send_packet(pkt)
-
-
-def read_mindflex(server, connection):
+def read_mindflex(connection):
     def broadcast_callback(data):
-        print data
-        broadcast_msg(server, '/mindflex', 'data', data)
-    connection.read(broadcast_callback)
+        print(data)
+        broadcast_msg('data', data)
+    try:
+        connection.read(broadcast_callback)
+    except Exception as e:
+        print("Error reading from MindFlex:", e)
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-class Application(object):
-    def __init__(self):
-        self.buffer = []
+@app.route('/<path:path>')
+def static_file(path):
+    return app.send_static_file(path) or app.send_static_file('index.html')
 
-    def __call__(self, environ, start_response):
-        path = environ['PATH_INFO'].strip('/') or 'index.html'
+@socketio.on('connect', namespace='/mindflex')
+def test_connect():
+    print('socketio ready')
 
-        if (path.startswith('static/') or 
-            path == 'index.html' or 
-            path == 'gif.html'):
-            try:
-                data = open(os.path.join(INTERFACE_FOLDER, path)).read()
-            except Exception:
-                return not_found(start_response)
-
-            if path.endswith(".js"):
-                content_type = "text/javascript"
-            elif path.endswith(".css"):
-                content_type = "text/css"
-            elif path.endswith(".swf"):
-                content_type = "application/x-shockwave-flash"
-            else:
-                content_type = "text/html"
-
-            start_response('200 OK', [('Content-Type', content_type)])
-            return [data]
-
-        if path.startswith("socket.io"):
-            socketio_manage(environ, {'/mindflex': BaseNamespace})
-            print 'socketio ready'
-        else:
-            return not_found(start_response)
-
-
-def not_found(start_response):
-    start_response('404 Not Found', [])
-    return ['<h1>Not Found</h1>']
-
+@socketio.on('disconnect', namespace='/mindflex')
+def test_disconnect():
+    print('Client disconnected')
 
 if __name__ == '__main__':
-    print '''Listening on port 8080 
-             and on port 10843 (flash policy server)'''
-    server = SocketIOServer(('0.0.0.0', 8080), 
-                            Application(),
-                            resource="socket.io", 
-                            policy_server=True,
-                            policy_listener=('0.0.0.0', 10843))
+    print('Listening on port 8080')
     connection = MindFlexConnection()
-    gevent.spawn(read_mindflex, server, connection)
-    server.serve_forever()
+    gevent.spawn(read_mindflex, connection)
+    socketio.run(app, host='0.0.0.0', port=8080)

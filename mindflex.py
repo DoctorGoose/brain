@@ -1,15 +1,16 @@
 import sys
 from serial import Serial
+import time
 
-DEBUG = False
-VERBOSE = False  # Verbose mode provides more raw EEG updates
-DEFAULT_PORT = '/dev/cu.MindflexOne-DevB'
+DEBUG = True
+VERBOSE = True  # Verbose mode provides more raw EEG updates
+DEFAULT_PORT = 'COM8'
 
 MAX_PACKET_LEN = 169
-RESET_CODE = '\x00\xF8\x00\x00\x00\xE0'
+RESET_CODE = b'\x00\xF8\x00\x00\x00\xE0'
 
 def _cb(data):
-    print data
+    print(data)
 
 def mf_parser(packet):
     # See the MindSet Communications Protocol
@@ -33,7 +34,7 @@ def mf_parser(packet):
         # EEG power
         elif code_level == 0x83:
             ret['eeg'] = []
-            for c in xrange(i + 1, i + 25, 3):
+            for c in range(i + 1, i + 25, 3):
                 ret['eeg'].append(ord(packet[c]) << 16 | 
                                   ord(packet[c + 1]) << 8 | 
                                   ord(packet[c + 2]))
@@ -51,7 +52,7 @@ class MindFlexConnection(object):
         self.verbose = verbose
         self.ser = Serial(port=port, baudrate=57600)
         if self.debug:
-            print 'Connection open'
+            print('Connection open')
         if self.debug:
             self.received = []
 
@@ -62,49 +63,46 @@ class MindFlexConnection(object):
             except Exception as e:
                 pass
                 #import pdb; pdb.post_mortem()
-            print 'Connection closed'
+            print('Connection closed')
 
     def read(self, callback=_cb):
-        prev_byte = 'c'
+        # Send RESET_CODE to switch to Mode 2
+        self.ser.write(RESET_CODE)
+        time.sleep(0.001)  # Short pause after sending RESET_CODE
+
+        prev_byte = b'c'
         in_packet = False
+        mode_2_confirmed = False
+
         try:
             while True:
                 cur_byte = self.ser.read(1)
-                if self.debug:
-                    self.received.append(cur_byte)
 
-                # If in Mode 1, enable Mode 2
-                if (not in_packet and 
-                    ord(prev_byte) == 224 and 
-                    ord(cur_byte) == 224):
-                    # Send reset code
-                    self.ser.write(RESET_CODE)
-                    if self.debug and ord(self.ser.read(1)) != 224:
-                        print 'Mode 2 enabled'
-                    prev_byte = cur_byte
+                # Confirm Mode 2 activation
+                if not mode_2_confirmed:
+                    if cur_byte != b'\xE0':  # If byte is not 224, Mode 2 is enabled
+                        print('Mode 2 enabled')
+                        mode_2_confirmed = True
                     continue
 
                 # Look for the start of the packet
-                if (not in_packet and 
-                    ord(prev_byte) == 170 and 
-                    ord(cur_byte) == 170):
-                    # print 'Start of new packet'
+                if not in_packet and prev_byte == b'\xAA' and cur_byte == b'\xAA':
                     in_packet = True
                     packet = []
                     continue
 
                 if in_packet:
                     if len(packet) == 0:
-                        if ord(cur_byte) == 170:
+                        if cur_byte == b'\xAA':
                             continue
                         packet_len = ord(cur_byte)
                         checksum_total = 0
                         packet = [cur_byte]
-                        if packet_len >=  MAX_PACKET_LEN:
-                            print 'Packet too long: %s' % packet_len
+                        if packet_len >= MAX_PACKET_LEN:
+                            print('Packet too long: %s' % packet_len)
                             in_packet = False
                             continue
-                    elif len(packet) - 1  == packet_len:
+                    elif len(packet) - 1 == packet_len:
                         packet_checksum = ord(cur_byte)
                         in_packet = False
                         if (~(checksum_total & 255) & 255) == packet_checksum:
@@ -112,29 +110,30 @@ class MindFlexConnection(object):
                                 if self.verbose or packet_len > 4:
                                     ret = mf_parser(packet)
                                     if self.debug:
-                                        print ret
+                                        print(ret)
                                     callback(ret)
                             except Exception as e:
-                                print 'Could not parse because of %s' % e
+                                print('Could not parse because of %s' % e)
                         else:
-                            print 'Warning: invalid checksum'
-                            print ~(checksum_total & 255) & 255
-                            print packet_checksum
-                            print packet
+                            print('Warning: invalid checksum')
+                            print(~(checksum_total & 255) & 255)
+                            print(packet_checksum)
+                            print(packet)
                             if self.debug:
                                 import pdb; pdb.set_trace()
                     else:
                         checksum_total += ord(cur_byte)
                         packet.append(cur_byte)
 
-                # keep track of last byte to catch sync bytes
+                # Keep track of the last byte to catch sync bytes
                 prev_byte = cur_byte
- 
+
         except KeyboardInterrupt as e:
             self.close()
             if self.debug:
-                print 'Exiting'
+                print('Exiting')
             sys.exit(0)
+
 
 def get_argparser():
     from argparse import ArgumentParser
