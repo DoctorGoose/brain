@@ -4,13 +4,12 @@
     <link href="static/css/style.css" rel="stylesheet">
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script type="text/javascript" src="static/jquery.flot.js"></script>
-    <script type="text/javascript" src="static/socket.io.js"></script>
     <script>
       $(function() {
-        var socket = io.connect('/mindflex');
+        var ws = new WebSocket(`ws://${window.location.hostname}:8081`);
 
         var options = {
-            series: { shadowSize: 0 }, // drawing is faster without shadows
+            series: { shadowSize: 0 },
             yaxis: { min: 0, max: 100 },
             xaxis: { show: false }
         };
@@ -30,71 +29,87 @@
             m1.push(0);
         }
         
-        var a_plot = $.plot($('#attention_graph'), [{data: enumerate(a1), label: 'attention'}, {data: enumerate(m1), label: 'meditation'}], options);
+        var a_plot = $.plot($('#attention_graph'), [
+            {data: enumerate(a1), label: 'attention'}, 
+            {data: enumerate(m1), label: 'meditation'}
+        ], options);
 
         var ctx = $("#canvas").get()[0].getContext("2d");
         var gradient = ctx.createLinearGradient(0,0,0,300);
-            gradient.addColorStop(1,'#5ebf36');
-            gradient.addColorStop(0.75,'#365ebf');
-            gradient.addColorStop(0.25,'#bf365e');
-            gradient.addColorStop(0,'#fff');
+        gradient.addColorStop(1,'#5ebf36');
+        gradient.addColorStop(0.75,'#365ebf');
+        gradient.addColorStop(0.25,'#bf365e');
+        gradient.addColorStop(0,'#fff');
 
         function drawSpectrum(array) {
             for (var i = 0; i < (array.length); i++ ){
                 var value = array[i] / 100000;
-
                 ctx.fillRect(i*75, 300-value, 73, 300);
             }
         };
 
-        socket.on('connect', function() {
+        ws.onopen = function() {
             console.log('WebSocket connected!');
-        });
+        };
 
-        socket.on('data', function(data) {
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            if (message.event !== 'data') return;
+            
+            const data = message.data;
+            
             var quality_percent = (200 - data.quality) / 2;
             if (data.quality < 60) {
-              $('#quality').attr('class', 'good connection').html('Connected (' + quality_percent + '%)');
+                $('#quality')
+                    .attr('class', 'good connection')
+                    .html('Connected (' + quality_percent + '%)');
             } else {
-              $('#quality').attr('class', 'bad connection').html('Poor signal (' + quality_percent + '%)');
+                $('#quality')
+                    .attr('class', 'bad connection')
+                    .html('Poor signal (' + quality_percent + '%)');
             }
+            
             a1 = a1.slice(1);
             m1 = m1.slice(1);
 
             a1.push(data.attention);
             m1.push(data.meditation);
             
-            a_plot.setData([{data: enumerate(a1), label: 'attention'}, {data: enumerate(m1), label: 'meditation'}]);
+            a_plot.setData([
+                {data: enumerate(a1), label: 'attention'}, 
+                {data: enumerate(m1), label: 'meditation'}
+            ]);
             a_plot.draw();
 
             ctx.clearRect(0, 0, 600, 300);
-
-            ctx.fillStyle=gradient;
+            ctx.fillStyle = gradient;
             
             if (data.quality < 60) {
-              drawSpectrum(data.eeg);
+                drawSpectrum(data.eeg);
             } else {
-              drawSpectrum([0, 0, 0, 0, 0, 0, 0]);
+                drawSpectrum([0, 0, 0, 0, 0, 0, 0]);
             }
-        });
+        };
 
         // Error handling
-        socket.on('connect_error', (error) => {
-          console.log('Connection Error:', error);
-        });
+        ws.onerror = function(error) {
+            console.log('WebSocket Error:', error);
+            $('#quality')
+                .attr('class', 'bad connection')
+                .html('Connection error');
+        };
 
-        socket.on('connect_timeout', (timeout) => {
-          console.log('Connection Timeout:', timeout);
-        });
-
-        socket.on('error', (error) => {
-          console.log('Error:', error);
-        });
-
-        socket.on('disconnect', (reason) => {
-          console.log('Disconnected:', reason);
-        });
-
+        ws.onclose = function() {
+            console.log('WebSocket Disconnected');
+            $('#quality')
+                .attr('class', 'bad connection')
+                .html('Disconnected');
+            
+            // Attempt to reconnect after 5 seconds
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        };
       });
     </script>
     <style>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+  <head>
+    <title>gif</title>
+    <script>
+    if ('registerElement' in document
+      && 'createShadowRoot' in HTMLElement.prototype
+      && 'import' in document.createElement('link')
+      && 'content' in document.createElement('template')) {
+      // Native Web Components support
+    } else {
+      document.write('<script src="https:\/\/cdnjs.cloudflare.com/ajax/libs/polymer/0.3.4/platform.js"><\/script>')
+    }
+    </script>
+    <style>
+    * {
+      font-family: sans-serif;
+    }
+    .image-container {
+      width: 100%;
+      height: 1000px;
+    }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <link rel="import" href="/static/dist/x-gif.html">
+    <script>
+    var timeout = false;
+    var score = 0;
+    
+    function new_gif() {
+      $.ajax({
+          type: "GET",
+          dataType: "jsonp",
+          cache: false,
+          url: "http://johnjohnston.info/oddsandends/ds106gif?f=jsonp&c=10",
+          success: function(data) {
+            timeout = true;
+            var rand = Math.round(Math.random() * data.length);
+            if (data[rand])  {
+              var gif_url = data[rand].url;
+            } else if (data[rand - 1]) {
+              var gif_url = data[rand - 1].url;
+            } else {
+              var gif_url = data[rand + 1].url;
+            }
+            $('.image-container').empty()
+                               .html('<x-gif src="' + gif_url + '" speed="1" id="gif" fill></x-gif>');
+            score = 0;
+            setTimeout(function(){ 
+                console.log('timeout reset'); 
+                timeout = false; 
+            }, 5000);
+          }
+      });
+    }
+
+    $(function() {
+        $('.debug').show().fadeOut(4000);
+
+        var ws = new WebSocket(`ws://${window.location.hostname}:8081`);
+
+        ws.onopen = function() {
+            console.log('WebSocket connected!');
+            $('.warning').hide();
+        };
+
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            if (message.event !== 'data') return;
+            
+            const data = message.data;
+            
+            $('#score').html(score);
+            score++;
+
+            if (data.quality < 60) {
+                // decent quality
+                $('.warning').hide(); 
+            } else {
+                $('.warning').show();
+            }
+
+            $('#attention').html(data.attention);
+            $('#meditation').html(data.meditation);
+            
+            var attention = data.attention / 100;
+            $('#gif').attr('speed', attention);
+            
+            if (!timeout && data.attention < data.meditation) {
+                $('.debug').show().fadeOut(4000);
+                new_gif();
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket Disconnected');
+            $('.warning').show();
+            
+            // Attempt to reconnect after 5 seconds
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        };
+
+        ws.onerror = function(error) {
+            console.log('WebSocket Error:', error);
+            $('.warning').show();
+        };
+    });
+    </script>
+    <style>
+    .box {
+      color: white;
+      position: absolute;
+      top: 2em;
+      left: 5em;
+      width: 10em;
+      z-index: 1000;
+      font-size: 50pt;
+      font-weight: 800;
+      padding: 1em;
+    }
+    .score {
+      background: rgba(218, 218, 218, 0.8);
+      top: 1em;
+      left: 1em;
+      width: 1em;
+      color: #000;
+      font-size: 25pt;
+    }
+    .warning {
+      background: rgba(250, 0, 0, 0.8);
+    }
+    .debug {
+      background: rgba(0, 250, 0, 0.8);
+      top: 5em !important;
+    }
+    </style>
+  </head>
+  <body unresolved>
+    <div class="box score"><span id="score">.</span></div>
+    <div class="box warning">No connection!</div>
+    <div class="box debug">
+      <p>attention: <span id="attention"></span></p>
+      <p>meditation: <span id="meditation"></span></p>
+    </div>
+    <div class="image-container">
+      <x-gif src="http://38.media.tumblr.com/9fd197cdf5b955e8ddf2498586b93843/tumblr_myj7i25arL1qzt4vjo1_500.gif" speed="1" id="gif" fill></x-gif>
+    </div>
+  </body>
+</html>

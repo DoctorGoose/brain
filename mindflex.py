@@ -4,7 +4,7 @@ import time
 
 DEBUG = True
 VERBOSE = True  # Verbose mode provides more raw EEG updates
-DEFAULT_PORT = 'COM8'
+DEFAULT_PORT = 'COM3'
 
 MAX_PACKET_LEN = 169
 RESET_CODE = b'\x00\xF8\x00\x00\x00\xE0'
@@ -18,35 +18,37 @@ def mf_parser(packet):
     # The first byte in the list was packet_len, so start at i = 1 
     i = 1
     while (i < len(packet) - 1):
-        code_level = ord(packet[i])
+        code_level = packet[i] if isinstance(packet[i], int) else ord(packet[i])
         # signal quality
         if code_level == 0x02:
-            ret['quality'] = ord(packet[i + 1])
+            ret['quality'] = packet[i + 1] if isinstance(packet[i + 1], int) else ord(packet[i + 1])
             i += 2
         # attention
         elif code_level == 0x04:
-            ret['attention'] = ord(packet[i + 1])
+            ret['attention'] = packet[i + 1] if isinstance(packet[i + 1], int) else ord(packet[i + 1])
             i += 2
         # meditation
         elif code_level == 0x05:
-            ret['meditation'] = ord(packet[i + 1])
+            ret['meditation'] = packet[i + 1] if isinstance(packet[i + 1], int) else ord(packet[i + 1])
             i += 2
         # EEG power
         elif code_level == 0x83:
             ret['eeg'] = []
             for c in range(i + 1, i + 25, 3):
-                ret['eeg'].append(ord(packet[c]) << 16 | 
-                                  ord(packet[c + 1]) << 8 | 
-                                  ord(packet[c + 2]))
+                v1 = packet[c] if isinstance(packet[c], int) else ord(packet[c])
+                v2 = packet[c + 1] if isinstance(packet[c + 1], int) else ord(packet[c + 1])
+                v3 = packet[c + 2] if isinstance(packet[c + 2], int) else ord(packet[c + 2])
+                ret['eeg'].append(v1 << 16 | v2 << 8 | v3)
             i += 26
         # Raw Wave Value
         elif code_level == 0x80:
-            ret['eeg_raw'] = ord(packet[i+1]) << 8 | ord(packet[i+2])
+            v1 = packet[i + 1] if isinstance(packet[i + 1], int) else ord(packet[i + 1])
+            v2 = packet[i + 2] if isinstance(packet[i + 2], int) else ord(packet[i + 2])
+            ret['eeg_raw'] = v1 << 8 | v2
             i += 4
     return ret
 
-
-class MindFlexConnection(object):
+class MindFlexConnection:
     def __init__(self, port=DEFAULT_PORT, debug=DEBUG, verbose=VERBOSE):
         self.debug = debug
         self.verbose = verbose
@@ -62,7 +64,6 @@ class MindFlexConnection(object):
                 self.ser.close()
             except Exception as e:
                 pass
-                #import pdb; pdb.post_mortem()
             print('Connection closed')
 
     def read(self, callback=_cb):
@@ -95,15 +96,15 @@ class MindFlexConnection(object):
                     if len(packet) == 0:
                         if cur_byte == b'\xAA':
                             continue
-                        packet_len = ord(cur_byte)
+                        packet_len = cur_byte[0]  # Python 3 bytes are already integers
                         checksum_total = 0
-                        packet = [cur_byte]
+                        packet = [cur_byte[0]]
                         if packet_len >= MAX_PACKET_LEN:
                             print('Packet too long: %s' % packet_len)
                             in_packet = False
                             continue
                     elif len(packet) - 1 == packet_len:
-                        packet_checksum = ord(cur_byte)
+                        packet_checksum = cur_byte[0]
                         in_packet = False
                         if (~(checksum_total & 255) & 255) == packet_checksum:
                             try:
@@ -122,18 +123,18 @@ class MindFlexConnection(object):
                             if self.debug:
                                 import pdb; pdb.set_trace()
                     else:
-                        checksum_total += ord(cur_byte)
-                        packet.append(cur_byte)
+                        byte_value = cur_byte[0]
+                        checksum_total += byte_value
+                        packet.append(byte_value)
 
                 # Keep track of the last byte to catch sync bytes
                 prev_byte = cur_byte
 
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             self.close()
             if self.debug:
                 print('Exiting')
             sys.exit(0)
-
 
 def get_argparser():
     from argparse import ArgumentParser
