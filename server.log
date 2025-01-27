@@ -1,0 +1,48 @@
+2025-01-26 22:38:31,805 - Using proactor: IocpProactor
+2025-01-26 22:38:31,806 - Starting WebSocket server...
+2025-01-26 22:38:31,825 - server listening on 127.0.0.1:8081
+2025-01-26 22:38:31,825 - Starting HTTP server...
+2025-01-26 22:38:31,825 - HTTP server running: http://127.0.0.1:8080
+2025-01-26 22:38:31,825 - WebSocket server running: ws://127.0.0.1:8081
+2025-01-26 22:38:49,945 - 127.0.0.1 [26/Jan/2025:22:38:49 -0500] "GET / HTTP/1.1" 200 1324 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+2025-01-26 22:38:50,231 - = connection is CONNECTING
+2025-01-26 22:38:50,233 - < GET / HTTP/1.1
+2025-01-26 22:38:50,233 - < Host: 127.0.0.1:8081
+2025-01-26 22:38:50,233 - < Connection: Upgrade
+2025-01-26 22:38:50,233 - < Pragma: no-cache
+2025-01-26 22:38:50,233 - < Cache-Control: no-cache
+2025-01-26 22:38:50,233 - < Upgrade: websocket
+2025-01-26 22:38:50,234 - < Origin: http://127.0.0.1:8080
+2025-01-26 22:38:50,234 - < Sec-WebSocket-Version: 13
+2025-01-26 22:38:50,234 - < User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36
+2025-01-26 22:38:50,234 - < Accept-Encoding: gzip, deflate, br, zstd
+2025-01-26 22:38:50,234 - < Accept-Language: en-US,en;q=0.9
+2025-01-26 22:38:50,234 - < Sec-GPC: 1
+2025-01-26 22:38:50,234 - < Sec-WebSocket-Key: CZd9g+gbthn25dVTJZEwJQ==
+2025-01-26 22:38:50,234 - < Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2025-01-26 22:38:50,234 - > HTTP/1.1 101 Switching Protocols
+2025-01-26 22:38:50,234 - > Date: Mon, 27 Jan 2025 03:38:50 GMT
+2025-01-26 22:38:50,234 - > Upgrade: websocket
+2025-01-26 22:38:50,234 - > Connection: Upgrade
+2025-01-26 22:38:50,234 - > Sec-WebSocket-Accept: rGahcf+F+PyWTibUi3YLuGQ9Qj0=
+2025-01-26 22:38:50,234 - > Sec-WebSocket-Extensions: permessage-deflate; server_max_window_bits=12; client_max_window_bits=12
+2025-01-26 22:38:50,234 - > Server: Python/3.13 websockets/14.1
+2025-01-26 22:38:50,235 - = connection is OPEN
+2025-01-26 22:38:50,235 - connection open
+2025-01-26 22:38:50,235 - WebSocket client connected: ('127.0.0.1', 58458)
+2025-01-26 22:38:51,236 - connection handler failed
+Traceback (most recent call last):
+  File "C:\Users\jorda\miniconda3\envs\brainenv\Lib\site-packages\websockets\asyncio\server.py", line 373, in conn_handler
+    await self.handler(connection)
+  File "C:\Users\jorda\Documents\GitHub\brain\minimal_server.py", line 74, in handle_websocket
+    "attention": random.randint(0, 100),
+                 ^^^^^^
+NameError: name 'random' is not defined. Did you forget to import 'random'?
+2025-01-26 22:38:51,239 - > CLOSE 1011 (internal error) [2 bytes]
+2025-01-26 22:38:51,239 - = connection is CLOSING
+2025-01-26 22:38:51,239 - < CLOSE 1011 (internal error) [2 bytes]
+2025-01-26 22:38:51,239 - > EOF
+2025-01-26 22:38:51,239 - x half-closing TCP connection
+2025-01-26 22:38:51,240 - < EOF
+2025-01-26 22:38:51,240 - = connection is CLOSED
+2025-01-26 22:39:57,808 - Shutting down...
