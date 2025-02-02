@@ -27,194 +27,139 @@ class EEGServer:
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Enhanced EEG Dashboard</title>
+            <title>EEG Dashboard</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                background-color: #1a1a1a;
+                color: #D3D3D3;
+              }
+              h1 {
+                color: #D3D3D3;
+                font-size: 28px;
+              }
+              canvas {
+                margin-bottom: 15px;
+              }
+              .nixie-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+              }
+              .nixie-label {
+                font-size: 18px;
+                margin-top: 5px;
+              }
+              .nixie-display {
+                display: inline-block;
+                font-family: "Courier New", Courier, monospace;
+                font-size: 50px;
+                background: radial-gradient(circle, #ff8c00, #ff4500);
+                border-radius: 5px;
+                padding: 10px;
+                width: 100px;
+                text-align: center;
+                text-shadow: 0px 0px 10px rgba(255, 165, 0, 0.7);
+                margin: 5px;
+              }
+            </style>
             <script>
-              let ws = new WebSocket(`ws://${window.location.hostname}:8081`);
-              let timeDomainChart, powerSpectrumChart, attentionBar, meditationBar, signalStrengthBar;
+              let ws = new WebSocket(ws://${window.location.hostname}:8081);
+              let rawSignalChart, powerSpectrumChart;
 
               ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.event === "data") {
-                  // Update raw signal (time domain)
-                  timeDomainChart.data.datasets[0].data = data.data.raw_signal;
-                  timeDomainChart.update();
+                  // Update truly raw signal
+                  rawSignalChart.data.datasets[0].data = data.data.raw_signal;
+                  rawSignalChart.update();
 
                   // Update power spectrum
                   powerSpectrumChart.data.labels = data.data.fft_freqs;
                   powerSpectrumChart.data.datasets[0].data = data.data.power_spectrum;
                   powerSpectrumChart.update();
 
-                  // Update bars
-                  attentionBar.data.datasets[0].data = [data.data.attention];
-                  meditationBar.data.datasets[0].data = [data.data.meditation];
-                  signalStrengthBar.data.datasets[0].data = [data.data.signal_strength];
-                  attentionBar.update();
-                  meditationBar.update();
-                  signalStrengthBar.update();
+                  // Update Nixie Tubes
+                  document.getElementById("attentionNixie").innerText = data.data.attention;
+                  document.getElementById("meditationNixie").innerText = data.data.meditation;
+                  document.getElementById("signalStrengthNixie").innerText = data.data.signal_strength;
                 }
               };
 
               window.onload = function () {
-                // Time-domain chart
-                const ctx1 = document.getElementById("timeDomainChart").getContext("2d");
-                timeDomainChart = new Chart(ctx1, {
+                // 🟢 RAW SIGNAL CHART
+                const ctx1 = document.getElementById("rawSignalChart").getContext("2d");
+                rawSignalChart = new Chart(ctx1, {
                   type: "line",
                   data: {
-                    labels: Array.from({ length: 512 }, (_, i) => i / 256), // Time labels
+                    labels: Array.from({ length: 256 }, (_, i) => (i / 256).toFixed(2)), // Time axis
                     datasets: [
                       {
-                        label: "Raw Signal",
+                        label: "Composite EEG Signal",
                         data: [],
-                        borderColor: "blue",
-                        borderWidth: 2,
+                        borderColor: "#10bac0",
+                        borderWidth: 4,
                         fill: false,
+                        tension: 0.4, // Smooth curves
                       },
                     ],
                   },
                   options: {
                     responsive: true,
                     scales: {
-                      x: { title: { display: true, text: "Time (s)" } },
-                      y: { title: { display: true, text: "Amplitude" } },
+                      x: {
+                        title: { display: true, text: "Time (s)" },
+                        ticks: { maxTicksLimit: 10 },
+                        grid: { display: false },
+                      },
+                      y: { title: { display: true, text: "Amplitude" }, grid: { display: false } },
                     },
                   },
                 });
 
-                // Power spectrum chart with vertical band lines
+                // 🔴 POWER SPECTRUM CHART
                 const ctx2 = document.getElementById("powerSpectrumChart").getContext("2d");
                 powerSpectrumChart = new Chart(ctx2, {
                   type: "line",
                   data: {
-                    labels: [], // Frequencies
+                    labels: [],
                     datasets: [
                       {
                         label: "Power Spectrum",
                         data: [],
-                        borderColor: "red",
-                        borderWidth: 2,
+                        borderColor: "#f52796",
+                        borderWidth: 4,
                         fill: false,
+                        tension: 0.4,
                       },
                     ],
                   },
                   options: {
                     responsive: true,
-                    plugins: {
-                      annotation: {
-                        annotations: {
-                          delta: {
-                            type: "line",
-                            xMin: 4,
-                            xMax: 4,
-                            borderColor: "black",
-                            borderWidth: 1,
-                            label: { content: "Delta", enabled: true, position: "end" },
-                          },
-                          theta: {
-                            type: "line",
-                            xMin: 8,
-                            xMax: 8,
-                            borderColor: "black",
-                            borderWidth: 1,
-                            label: { content: "Theta", enabled: true, position: "end" },
-                          },
-                          alpha: {
-                            type: "line",
-                            xMin: 12,
-                            xMax: 12,
-                            borderColor: "black",
-                            borderWidth: 1,
-                            label: { content: "Alpha", enabled: true, position: "end" },
-                          },
-                          beta: {
-                            type: "line",
-                            xMin: 30,
-                            xMax: 30,
-                            borderColor: "black",
-                            borderWidth: 1,
-                            label: { content: "Beta", enabled: true, position: "end" },
-                          },
-                          gamma: {
-                            type: "line",
-                            xMin: 50,
-                            xMax: 50,
-                            borderColor: "black",
-                            borderWidth: 1,
-                            label: { content: "Gamma", enabled: true, position: "end" },
-                          },
-                        },
-                      },
-                    },
                     scales: {
                       x: {
                         title: { display: true, text: "Frequency (Hz)" },
+                        type: "logarithmic",
+                        ticks: { min: 0.5, max: 50, callback: (value) => value },
+                        grid: { display: false },
                       },
-                      y: { title: { display: true, text: "Power" } },
+                      y: { title: { display: true, text: "Power" }, grid: { display: false } },
                     },
-                  },
-                });
-
-                // Attention bar
-                const ctx3 = document.getElementById("attentionBar").getContext("2d");
-                attentionBar = new Chart(ctx3, {
-                  type: "bar",
-                  data: {
-                    labels: ["Attention"],
-                    datasets: [
-                      {
-                        label: "Attention",
-                        data: [0],
-                        backgroundColor: "orange",
+                    plugins: {
+                      annotation: {
+                        annotations: {
+                          delta: { type: "box", xMin: 0.5, xMax: 4, backgroundColor: "rgba(255, 165, 0, 0.2)" },
+                          theta: { type: "box", xMin: 4, xMax: 8, backgroundColor: "rgba(255, 165, 0, 0.5)" },
+                          alpha: { type: "box", xMin: 8, xMax: 12, backgroundColor: "rgba(255, 0, 0, 0.2)" },
+                          beta: { type: "box", xMin: 12, xMax: 30, backgroundColor: "rgba(255, 0, 0, 0.5)" },
+                          gamma: { type: "box", xMin: 30, xMax: 50, backgroundColor: "rgba(128, 0, 128, 0.5)" },
+                        },
                       },
-                    ],
-                  },
-                  options: {
-                    responsive: true,
-                    indexAxis: "y",
-                    scales: { x: { max: 100 } },
-                  },
-                });
-
-                // Meditation bar
-                const ctx4 = document.getElementById("meditationBar").getContext("2d");
-                meditationBar = new Chart(ctx4, {
-                  type: "bar",
-                  data: {
-                    labels: ["Meditation"],
-                    datasets: [
-                      {
-                        label: "Meditation",
-                        data: [0],
-                        backgroundColor: "green",
-                      },
-                    ],
-                  },
-                  options: {
-                    responsive: true,
-                    indexAxis: "y",
-                    scales: { x: { max: 100 } },
-                  },
-                });
-
-                // Signal strength bar
-                const ctx5 = document.getElementById("signalStrengthBar").getContext("2d");
-                signalStrengthBar = new Chart(ctx5, {
-                  type: "bar",
-                  data: {
-                    labels: ["Signal Strength"],
-                    datasets: [
-                      {
-                        label: "Signal Strength",
-                        data: [0],
-                        backgroundColor: "blue",
-                      },
-                    ],
-                  },
-                  options: {
-                    responsive: true,
-                    indexAxis: "y",
-                    scales: { x: { max: 5 } },
+                    },
                   },
                 });
               };
@@ -223,15 +168,28 @@ class EEGServer:
           <body>
             <h1>Enhanced EEG Dashboard</h1>
 
-            <canvas id="timeDomainChart" width="800" height="400"></canvas>
-            <canvas id="powerSpectrumChart" width="800" height="400"></canvas>
+            <canvas id="rawSignalChart" width="600" height="300"></canvas>
 
-            <h2>Metrics</h2>
-            <canvas id="attentionBar" width="300" height="65"></canvas>
-            <canvas id="meditationBar" width="300" height="65"></canvas>
-            <canvas id="signalStrengthBar" width="300" height="65"></canvas>
+            <!-- NIXIE TUBES -->
+            <div class="nixie-container">
+              <div>
+                <div class="nixie-display" id="attentionNixie">00</div>
+                <div class="nixie-label">Attention</div>
+              </div>
+              <div>
+                <div class="nixie-display" id="meditationNixie">00</div>
+                <div class="nixie-label">Meditation</div>
+              </div>
+              <div>
+                <div class="nixie-display" id="signalStrengthNixie">00</div>
+                <div class="nixie-label">Signal Strength</div>
+              </div>
+            </div>
+
+            <canvas id="powerSpectrumChart" width="600" height="300"></canvas>
           </body>
         </html>
+
         """
         return web.Response(text=html, content_type="text/html")
 
